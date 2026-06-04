@@ -1,176 +1,117 @@
+import HeroSection from "@/components/home/HeroSection";
+import ProductSection from "@/components/home/ProductSection";
+import FlashSaleSection from "@/components/home/FlashSaleSection";
+import DirectoryFooter from "@/components/home/DirectoryFooter";
+import QuickActions from "@/components/home/QuickActions";
 import { prisma } from "@/lib/prisma";
-import styles from "./page.module.css";
+import type { FlashSale, FlashSaleItem, Product } from "@/types";
 
-function formatRupiah(price: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(price);
-}
+export const dynamic = 'force-dynamic';
 
 export default async function Home() {
+  // Ambil 8 kategori utama untuk tampilan homepage
+  const categories = await prisma.category.findMany({
+    orderBy: { name: 'asc' },
+    take: 19
+  });
+
+  // Ambil Flash Sale yang sedang aktif
+  const now = new Date();
+  let activeFlashSale = await prisma.flashSale.findFirst({
+    where: {
+      isActive: true,
+      startTime: { lte: now },
+      endTime: { gte: now }
+    },
+    include: {
+      items: {
+        include: {
+          product: true
+        }
+      }
+    }
+  });
+
+  // Ambil semua produk untuk grid produk unggulan
   const products = await prisma.product.findMany({
-    orderBy: { createdAt: "desc" },
+    include: {
+      supplier: true
+    },
+    take: 24, // 24 produk untuk unggulan
+    orderBy: {
+      createdAt: 'desc'
+    }
+  });
+
+  // MOCK DATA: Jika tidak ada flash sale aktif di database, tampilkan data dummy untuk keperluan showcase UI
+  if (!activeFlashSale) {
+    // Gunakan target waktu tetap (akhir minggu ini) agar tidak reset saat di-refresh
+    const endOfWeek = new Date();
+    const daysUntilSunday = 7 - endOfWeek.getDay();
+    endOfWeek.setDate(endOfWeek.getDate() + (daysUntilSunday === 0 ? 0 : daysUntilSunday));
+    endOfWeek.setHours(23, 59, 59, 999);
+    
+    // Gunakan produk dari database jika ada, jika tidak buat hardcoded dummy
+    const sourceProducts = products.length > 0 ? [...products, ...products, ...products] : Array(8).fill(null).map((_, i) => ({
+      id: `fallback-product-${i}`,
+      name: `Produk Promo Spesial ${i+1}`,
+      price: 150000 + (i * 25000),
+      imageUrl: `https://loremflickr.com/500/500/product?random=${i}`
+    }));
+
+    activeFlashSale = {
+      id: "dummy-flash-sale",
+      title: "Flash Deal Spesial",
+      startTime: now,
+      endTime: endOfWeek,
+      isActive: true,
+      bannerUrl: null,
+      createdAt: now,
+      updatedAt: now,
+      items: sourceProducts.slice(0, 8).map((p, index) => ({
+        id: `dummy-fs-item-${index}`,
+        flashSaleId: "dummy-flash-sale",
+        productId: p.id,
+        discountPrice: Math.floor(p.price * 0.4), // Diskon 60%
+        stock: 50,
+        sold: Math.floor(Math.random() * 40) + 5,
+        product: p
+      }))
+    } as any;
+  }
+
+  // Ambil produk rekomendasi (skip 24 pertama agar berbeda dari produk unggulan)
+  const recommendedProducts = await prisma.product.findMany({
+    include: {
+      supplier: true
+    },
+    take: 24, // 24 produk untuk rekomendasi
+    skip: 24, // Melewati 24 produk unggulan
+    orderBy: {
+      createdAt: 'desc'
+    }
   });
 
   return (
-    <>
-      {/* Navbar */}
-      <nav className={styles.navbar}>
-        <div className={styles.navContainer}>
-          <div className={styles.navContent}>
-            <a href="/" className={styles.logo}>
-              <span className={styles.logoIcon}>🛒</span>
-              <span className={styles.logoText}>LokalMart</span>
-            </a>
-            <div className={styles.navLinks}>
-              <a href="#produk" className={styles.navLink}>Produk</a>
-              <a href="#tentang" className={styles.navLink}>Tentang</a>
-              <a href="#kontak" className={styles.navLink}>Kontak</a>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="bg-[#F7F8FA] min-h-screen">
+      
+      {/* Area Atas: Hero (Promo) & Menu Akses Cepat */}
+      <HeroSection />
+      <QuickActions />
 
-      {/* Hero Section */}
-      <section className={styles.hero}>
-        <div className={styles.heroContainer}>
-          <div className={styles.heroContent}>
-            <div className={styles.heroBadge}>
-              <span>🇮🇩</span> Dukung UMKM Lokal
-            </div>
-            <h1 className={styles.heroTitle}>
-              Belanja Produk <span className={styles.heroTitleHighlight}>UMKM Terbaik</span> dari Seluruh Indonesia
-            </h1>
-            <p className={styles.heroSubtitle}>
-              Temukan produk-produk berkualitas langsung dari pengusaha lokal.
-              Setiap pembelian Anda membantu memajukan ekonomi Indonesia. 🚀
-            </p>
-            <div className={styles.heroActions}>
-              <a href="#produk" className={styles.btnPrimary}>
-                Lihat Produk
-              </a>
-              <a href="#tentang" className={styles.btnSecondary}>
-                Pelajari Lebih Lanjut
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Banner Flash Sale (Jika Ada) */}
+      <FlashSaleSection flashSale={activeFlashSale as any} />
 
-      {/* Stats Section */}
-      <section className={styles.stats}>
-        <div className={styles.statsContainer}>
-          <div className={styles.statsGrid}>
-            <div>
-              <p className={styles.statValue}>{products.length}+</p>
-              <p className={styles.statLabel}>Produk UMKM</p>
-            </div>
-            <div>
-              <p className={styles.statValue}>100+</p>
-              <p className={styles.statLabel}>Mitra UMKM</p>
-            </div>
-            <div>
-              <p className={styles.statValue}>34</p>
-              <p className={styles.statLabel}>Provinsi</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Grid Kategori & Produk Unggulan */}
+      <ProductSection 
+        categories={categories}
+        products={products}
+        recommendedProducts={recommendedProducts}
+      />
 
-      {/* Products Section */}
-      <section id="produk" className={styles.products}>
-        <header className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Produk Unggulan 🔥</h2>
-          <p className={styles.sectionSubtitle}>
-            Produk pilihan dari UMKM terbaik Indonesia, langsung dari produsennya.
-          </p>
-        </header>
+      {/* Direktori Kategori Raksasa (SEO Footer) */}
+      <DirectoryFooter />
 
-        {products.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>📦</div>
-            <p className={styles.emptyText}>
-              Belum ada produk. Jalankan <code className={styles.codeBlock}>npx prisma db seed</code> untuk menambahkan produk contoh.
-            </p>
-          </div>
-        ) : (
-          <div className={styles.productGrid}>
-            {products.map((product) => (
-              <article key={product.id} className={styles.productCard}>
-                <div className={styles.productImageWrapper}>
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className={styles.productImage}
-                    />
-                  ) : (
-                    <div className={styles.productPlaceholder}>📦</div>
-                  )}
-                  <span className={styles.productBadge}>
-                    Stok: {product.stock}
-                  </span>
-                </div>
-                <div className={styles.productInfo}>
-                  <h3 className={styles.productName}>{product.name}</h3>
-                  <p className={styles.productDesc}>{product.description}</p>
-                  <div className={styles.productFooter}>
-                    <p className={styles.productPrice}>{formatRupiah(product.price)}</p>
-                    <button className={styles.btnCart}>+ Keranjang</button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* About Section */}
-      <section id="tentang" className={styles.about}>
-        <div className={styles.aboutContainer}>
-          <header className={styles.aboutHeader}>
-            <h2 className={styles.sectionTitle}>Kenapa LokalMart? 🤔</h2>
-            <p className={styles.aboutDesc}>
-              Kami menghubungkan produk UMKM berkualitas dengan konsumen yang peduli. 
-              Setiap transaksi di LokalMart membantu menggerakkan roda ekonomi lokal Indonesia.
-            </p>
-          </header>
-          
-          <div className={styles.featureGrid}>
-            <div className={styles.featureCard}>
-              <p className={styles.featureIcon}>🏪</p>
-              <h3 className={styles.featureTitle}>Langsung dari UMKM</h3>
-              <p className={styles.featureDesc}>Tanpa perantara, harga lebih terjangkau.</p>
-            </div>
-            <div className={styles.featureCard}>
-              <p className={styles.featureIcon}>✅</p>
-              <h3 className={styles.featureTitle}>Kualitas Terjamin</h3>
-              <p className={styles.featureDesc}>Produk dikurasi oleh tim ahli kami.</p>
-            </div>
-            <div className={styles.featureCard}>
-              <p className={styles.featureIcon}>🚚</p>
-              <h3 className={styles.featureTitle}>Pengiriman Cepat</h3>
-              <p className={styles.featureDesc}>Sampai ke pintu rumah Anda dengan aman.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer id="kontak" className={styles.footer}>
-        <div className={styles.footerContainer}>
-          <div className={styles.footerLogo}>
-            <span className={styles.logoIcon}>🛒</span>
-            <span className={styles.footerLogoText}>LokalMart</span>
-          </div>
-          <p className={styles.footerText}>
-            © 2025 LokalMart. Dukung UMKM, Majukan Indonesia. 🇮🇩
-          </p>
-        </div>
-      </footer>
-    </>
+    </div>
   );
 }
-
