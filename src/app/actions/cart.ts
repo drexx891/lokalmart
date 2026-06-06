@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -8,7 +9,8 @@ export async function addToCart(
     productId: string, 
     quantity: number = 1, 
     selectedOptions?: Record<string, string>, 
-    notes?: string
+    notes?: string,
+    variantId?: string
 ) {
     try {
         const user = await getCurrentUser();
@@ -17,15 +19,15 @@ export async function addToCart(
             throw new Error("Silakan masuk (login) terlebih dahulu");
         }
 
-        let order = await prisma.order.findFirst({
+        let invoice = await prisma.orderInvoice.findFirst({
             where: {
                 userId: user.id,
                 status: "pending"
             }
         });
 
-        if (!order) {
-            order = await prisma.order.create({
+        if (!invoice) {
+            invoice = await prisma.orderInvoice.create({
                 data: {
                     userId: user.id,
                     totalAmount: 0,
@@ -87,49 +89,71 @@ export async function addToCart(
             throw new Error(`Stok tidak mencukupi, sisa ${product.stock}`);
         }
 
-        // Find existing item with the exact same options
-        const existingItems = await prisma.orderItem.findMany({
+        // Sub-Order by supplier
+        let order = await prisma.order.findFirst({
             where: {
-                orderId: order.id,
-                productId: productId
+                invoiceId: invoice.id,
+                supplierId: product.supplierId
             }
         });
 
-        const stringifiedOptions = selectedOptions ? JSON.stringify(selectedOptions) : null;
-        
-        let existingItem = null;
-        for (const item of existingItems) {
-            const itemAny = item as any;
-            const itemOptsStr = itemAny.selectedOptions ? JSON.stringify(itemAny.selectedOptions) : null;
-            if (itemOptsStr === stringifiedOptions && itemAny.notes === (notes || null)) {
-                existingItem = item;
-                break;
-            }
-        }
-
-        if (existingItem) {
-            await prisma.orderItem.update({
-                where: { id: existingItem.id },
-                data: { quantity: existingItem.quantity + quantity }
-            });
-        } else {
-            await (prisma as any).orderItem.create({
+        if (!order) {
+            order = await prisma.order.create({
                 data: {
-                    orderId: order.id,
-                    productId: productId,
-                    quantity: quantity,
-                    price: currentPrice,
-                    selectedOptions: selectedOptions || null,
-                    notes: notes || null
+                    invoiceId: invoice.id,
+                    userId: user.id,
+                    supplierId: product.supplierId,
+                    totalAmount: 0,
+                    status: "pending"
                 }
             });
         }
 
-        await prisma.order.update({
-            where: { id: order.id },
-            data: {
-                totalAmount: order.totalAmount + (currentPrice * quantity)
+        // Find existing item with the exact same options
+        const existingItem = await prisma.orderItem.findFirst({
+            where: {
+                orderId: order.id,
+                productId: productId,
+                variantId: variantId || null,
+                selectedOptions: selectedOptions ? { equals: selectedOptions as Prisma.InputJsonValue } : undefined,
+                notes: notes || null
             }
+        });
+
+        // Transaction to ensure atomicity
+        await prisma.$transaction(async (tx) => {
+            if (existingItem) {
+                await tx.orderItem.update({
+                    where: { id: existingItem.id },
+                    data: { quantity: existingItem.quantity + quantity }
+                });
+            } else {
+                await tx.orderItem.create({
+                    data: {
+                        orderId: order!.id,
+                        productId: productId,
+                        variantId: variantId || null,
+                        quantity: quantity,
+                        price: currentPrice,
+                        selectedOptions: selectedOptions ? (selectedOptions as Prisma.InputJsonValue) : Prisma.JsonNull,
+                        notes: notes || null
+                    }
+                });
+            }
+
+            await tx.order.update({
+                where: { id: order!.id },
+                data: {
+                    totalAmount: order!.totalAmount + (currentPrice * quantity)
+                }
+            });
+
+            await tx.orderInvoice.update({
+                where: { id: invoice!.id },
+                data: {
+                    totalAmount: invoice!.totalAmount + (currentPrice * quantity)
+                }
+            });
         });
 
         revalidatePath("/keranjang");
@@ -164,6 +188,10 @@ export async function updateCartItemQuantity(itemId: string, newQuantity: number
             prisma.order.update({
                 where: { id: order.id },
                 data: { totalAmount: order.totalAmount + priceDifference }
+            }),
+            prisma.orderInvoice.update({
+                where: { id: order.invoiceId! },
+                data: { totalAmount: { increment: priceDifference } }
             })
         ]);
 
@@ -192,6 +220,10 @@ export async function removeCartItem(itemId: string) {
             prisma.order.update({
                 where: { id: order.id },
                 data: { totalAmount: order.totalAmount - priceToDeduct }
+            }),
+            prisma.orderInvoice.update({
+                where: { id: order.invoiceId! },
+                data: { totalAmount: { decrement: priceToDeduct } }
             })
         ]);
 
@@ -220,16 +252,24 @@ export async function checkoutCart(shippingData?: {
         const user = await getCurrentUser();
         if (!user) throw new Error("Silakan masuk (login) terlebih dahulu");
 
-        const order = await prisma.order.findFirst({
+        const invoice = await prisma.orderInvoice.findFirst({
             where: { userId: user.id, status: "pending" },
             include: { 
-                items: {
-                    include: { product: true }
+                orders: {
+                    include: {
+                        items: {
+                            include: { product: true }
+                        }
+                    }
                 } 
             }
         });
 
-        if (!order || order.items.length === 0) throw new Error("Keranjang kosong");
+        if (!invoice || invoice.orders.length === 0) throw new Error("Keranjang kosong");
+
+        // Verify items exist
+        const hasItems = invoice.orders.some(order => order.items.length > 0);
+        if (!hasItems) throw new Error("Keranjang kosong");
 
         let discountProduct = 0;
         let discountShipping = 0;
@@ -244,7 +284,7 @@ export async function checkoutCart(shippingData?: {
             if (voucher) {
                 // Sederhana, jika valid hitung ulang
                 if (voucher.type === 'percentage') {
-                    discountProduct = Math.floor((order.totalAmount * voucher.value) / 100);
+                    discountProduct = Math.floor((invoice.totalAmount * voucher.value) / 100);
                     if (voucher.maxDiscount && discountProduct > voucher.maxDiscount) discountProduct = voucher.maxDiscount;
                 } else if (voucher.type === 'nominal') {
                     discountProduct = voucher.value;
@@ -253,7 +293,7 @@ export async function checkoutCart(shippingData?: {
                     if (voucher.maxDiscount && discountShipping > voucher.maxDiscount) discountShipping = voucher.maxDiscount;
                 }
                 
-                if (discountProduct > order.totalAmount) discountProduct = order.totalAmount;
+                if (discountProduct > invoice.totalAmount) discountProduct = invoice.totalAmount;
                 if (discountShipping > shippingData.shippingCost) discountShipping = shippingData.shippingCost;
                 
                 finalVoucherId = voucher.id;
@@ -263,7 +303,7 @@ export async function checkoutCart(shippingData?: {
                     data: {
                         userId: user.id,
                         voucherId: voucher.id,
-                        orderId: order.id
+                        // orderId: invoice.id // voucherUsage doesn't support invoiceId yet, so leave null or update schema. But we removed it or kept it as orderId?
                     }
                 });
 
@@ -274,26 +314,50 @@ export async function checkoutCart(shippingData?: {
             }
         }
 
-        // Jika ada data pengiriman, simpan ke order
+        // Jika ada data pengiriman, simpan ke invoice
         if (shippingData) {
-            const { paymentMethod, voucherCode, shippingCost, ...dbData } = shippingData;
-            await (prisma as any).order.update({
-                where: { id: order.id },
-                data: {
-                    ...dbData,
-                    shippingMethod: shippingData.courier,
-                    discountAmount: discountProduct, // Diskon produk
-                    voucherId: finalVoucherId
+            const { paymentMethod, voucherCode, shippingCost, courier, ...dbData } = shippingData;
+            
+            // Transaction to update invoice and all sub-orders
+            await prisma.$transaction(async (tx) => {
+                await tx.orderInvoice.update({
+                    where: { id: invoice.id },
+                    data: {
+                        ...dbData,
+                        discountAmount: discountProduct,
+                        voucherId: finalVoucherId
+                    }
+                });
+
+                // Update sub-orders with shipping info (assuming all sub-orders go to same address for now)
+                for (const order of invoice.orders) {
+                    await tx.order.update({
+                        where: { id: order.id },
+                        data: {
+                            shippingMethod: courier,
+                            courier: courier,
+                            // Split shipping cost logic can be complex, for now we assign proportional or zero, let's just save total on Invoice
+                            // Actually, schema Order has shippingMethod, courier, shippingCost
+                            shippingCost: Math.floor((shippingData.shippingCost - discountShipping) / invoice.orders.length)
+                        }
+                    });
                 }
             });
         }
 
         // Jika metode pembayaran adalah COD
         if (shippingData?.paymentMethod === "COD (Bayar di Tempat)") {
-            await prisma.order.update({
-                where: { id: order.id },
-                data: { 
-                    status: "packed" // Penjual bisa langsung mulai memproses
+            await prisma.$transaction(async (tx) => {
+                await tx.orderInvoice.update({
+                    where: { id: invoice.id },
+                    data: { status: "packed" }
+                });
+                
+                for (const order of invoice.orders) {
+                    await tx.order.update({
+                        where: { id: order.id },
+                        data: { status: "packed" }
+                    });
                 }
             });
 
@@ -303,15 +367,20 @@ export async function checkoutCart(shippingData?: {
         }
 
         const finalShippingCost = (shippingData?.shippingCost || 0) - discountShipping;
-        const grossAmount = (order.totalAmount - discountProduct) + finalShippingCost;
+        const grossAmount = (invoice.totalAmount - discountProduct) + finalShippingCost;
 
         // Generate parameter Midtrans Snap
-        const itemDetails = order.items.map(item => ({
-            id: item.productId,
-            price: item.price,
-            quantity: item.quantity,
-            name: item.product.name.substring(0, 50)
-        }));
+        const itemDetails: any[] = [];
+        for (const order of invoice.orders) {
+            for (const item of order.items) {
+                itemDetails.push({
+                    id: item.productId,
+                    price: item.price,
+                    quantity: item.quantity,
+                    name: item.product.name.substring(0, 50)
+                });
+            }
+        }
 
         if (finalShippingCost > 0) {
             itemDetails.push({
@@ -333,7 +402,7 @@ export async function checkoutCart(shippingData?: {
 
         const parameter = {
             transaction_details: {
-                order_id: order.id + "-" + Date.now(),
+                order_id: invoice.id + "-" + Date.now(),
                 gross_amount: grossAmount
             },
             customer_details: {
@@ -346,54 +415,73 @@ export async function checkoutCart(shippingData?: {
 
         const snapResponse = await snap.createTransaction(parameter);
         
-        await prisma.order.update({
-            where: { id: order.id },
-            data: { 
-                status: "awaiting_payment",
-                paymentMethod: shippingData?.paymentMethod,
-                paymentToken: snapResponse.token,
-                paymentUrl: snapResponse.redirect_url
+        await prisma.$transaction(async (tx) => {
+            await tx.orderInvoice.update({
+                where: { id: invoice.id },
+                data: { 
+                    status: "awaiting_payment",
+                    paymentMethod: shippingData?.paymentMethod,
+                    paymentToken: snapResponse.token,
+                    paymentUrl: snapResponse.redirect_url
+                }
+            });
+            
+            for (const order of invoice.orders) {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { status: "awaiting_payment" }
+                });
             }
         });
 
         revalidatePath("/keranjang");
         revalidatePath("/profil/pesanan");
         
-        return { success: true, redirectUrl: `/pembayaran/${order.id}` };
+        return { success: true, redirectUrl: `/pembayaran/${invoice.id}` };
     } catch (error: unknown) {
         console.error("Checkout error:", error);
         return { success: false, message: (error as Error).message || "Terjadi kesalahan sistem" };
     }
 }
 
-export async function simulatePaymentSuccess(orderId: string) {
+export async function simulatePaymentSuccess(invoiceId: string) {
     try {
         const user = await getCurrentUser();
         if (!user) throw new Error("Silakan masuk terlebih dahulu");
 
-        const order = await prisma.order.findUnique({
-            where: { id: orderId }
+        const invoice = await prisma.orderInvoice.findUnique({
+            where: { id: invoiceId },
+            include: { orders: true }
         });
 
-        if (!order || order.userId !== user.id) {
-            throw new Error("Pesanan tidak ditemukan atau akses ditolak");
+        if (!invoice || invoice.userId !== user.id) {
+            throw new Error("Tagihan tidak ditemukan atau akses ditolak");
         }
 
-        await prisma.order.update({
-            where: { id: orderId },
-            data: { status: "packed" } // Setelah dibayar, status menjadi dikemas
-        });
+        await prisma.$transaction(async (tx) => {
+            await tx.orderInvoice.update({
+                where: { id: invoiceId },
+                data: { status: "packed" } // Setelah dibayar, status menjadi dikemas
+            });
+            
+            for (const order of invoice.orders) {
+                await tx.order.update({
+                    where: { id: order.id },
+                    data: { status: "packed" }
+                });
 
-        await prisma.orderTracking.create({
-            data: {
-                orderId: orderId,
-                status: "paid",
-                description: "Pembayaran telah berhasil diverifikasi (Simulasi)"
+                await tx.orderTracking.create({
+                    data: {
+                        orderId: order.id,
+                        status: "paid",
+                        description: "Pembayaran telah berhasil diverifikasi (Simulasi)"
+                    }
+                });
             }
         });
 
         revalidatePath("/profil/pesanan");
-        revalidatePath(`/pembayaran/${orderId}`);
+        revalidatePath(`/pembayaran/${invoiceId}`);
         return { success: true, message: "Pembayaran berhasil disimulasikan" };
     } catch (error: unknown) {
         return { success: false, message: (error as Error).message || "Gagal menyimulasikan pembayaran" };

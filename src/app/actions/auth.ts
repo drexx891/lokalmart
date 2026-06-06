@@ -67,6 +67,10 @@ export async function loginAction(formData: FormData) {
             return { success: false, message: "Email atau kata sandi salah" };
         }
 
+        if (user.role === 'admin' || user.role === 'supplier') {
+            return { success: false, message: `Akses ditolak: Akun ${user.role} tidak dapat masuk melalui portal utama. Silakan gunakan portal khusus.` };
+        }
+
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
             return { success: false, message: "Email atau kata sandi salah" };
@@ -88,4 +92,48 @@ export async function logoutAction() {
     const session = await getSession();
     session.destroy();
     redirect("/login");
+}
+
+export async function adminLoginAction(formData: FormData) {
+    const data = Object.fromEntries(formData.entries());
+    const email = data.email as string;
+    const password = data.password as string;
+    const pin2FA = data.pin2FA as string;
+
+    if (!email || !password || !pin2FA) {
+        return { success: false, message: "Email, Password, dan PIN wajib diisi" };
+    }
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!user || !user.password || user.role !== 'admin') {
+            return { success: false, message: "Akses ditolak" };
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+            return { success: false, message: "Email atau kata sandi salah" };
+        }
+
+        if (user.pin2FA !== pin2FA) {
+            return { success: false, message: "PIN 2FA salah" };
+        }
+
+        if (user.isSuspended) {
+            return { success: false, message: "Akun ini telah ditangguhkan" };
+        }
+
+        const session = await getSession();
+        session.userId = user.id;
+        session.role = user.role;
+        session.isLoggedIn = true;
+        await session.save();
+
+        return { success: true, message: "Berhasil masuk sebagai Admin" };
+    } catch (error) {
+        return { success: false, message: "Terjadi kesalahan sistem" };
+    }
 }

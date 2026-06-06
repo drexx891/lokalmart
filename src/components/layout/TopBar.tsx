@@ -5,6 +5,10 @@ export default function TopBar() {
     <div className="bg-[#F7F8FA] text-[#6B7280] text-xs py-1.5 px-4 hidden md:flex justify-between items-center border-b border-[#E5E7EB]">
       {/* Kiri */}
       <div className="flex items-center gap-4">
+        <Link href="/buka-toko" className="hover:text-[#1A3C6E] transition-colors font-medium">
+          Jual di Belio
+        </Link>
+        <span className="text-[#E5E7EB]">|</span>
         <span>Platform Perdagangan Aman dengan Produk Berkualitas</span>
       </div>
 

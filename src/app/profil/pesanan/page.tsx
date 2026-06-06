@@ -13,12 +13,9 @@ export default async function RiwayatPesananPage() {
     // Order dengan status pending tapi sudah memiliki informasi pengiriman (berarti sudah dicheckout atau ada metode)
     // Atau ambil semua order yang bukan keranjang. Keranjang adalah order.status === "pending" dan paymentUrl == null dsb.
     // Tapi karena kita menyimpan keranjang sebagai "pending", kita filter:
-    const orders = await prisma.order.findMany({
+    const invoices = await prisma.orderInvoice.findMany({
         where: {
             userId: user.id,
-            // Kita tidak menampilkan keranjang belanja ("pending" murni tanpa checkout info)
-            // Tapi jika statusnya "packed", "shipped", dll, tampilkan
-            // Jika "pending" tapi sudah checkout (biasanya awaiting_payment), tampilkan
             NOT: {
                 status: "pending"
             }
@@ -27,11 +24,12 @@ export default async function RiwayatPesananPage() {
             createdAt: "desc"
         },
         include: {
-            items: {
+            orders: {
                 include: {
-                    product: {
+                    supplier: true,
+                    items: {
                         include: {
-                            supplier: true
+                            product: true
                         }
                     }
                 }
@@ -39,5 +37,5 @@ export default async function RiwayatPesananPage() {
         }
     });
 
-    return <OrderHistoryClient orders={orders} />;
+    return <OrderHistoryClient invoices={invoices} />;
 }

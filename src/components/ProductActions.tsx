@@ -20,6 +20,7 @@ export default function ProductActions({
     isPreOrder,
     preOrderDays,
     customOptionsRaw,
+    variants,
     disabled 
 }: { 
     productId: string;
@@ -31,6 +32,7 @@ export default function ProductActions({
     isPreOrder?: boolean;
     preOrderDays?: number | null;
     customOptionsRaw?: any;
+    variants?: any[];
     disabled?: boolean;
 }) {
     const [quantity, setQuantity] = useState(minOrder);
@@ -38,7 +40,7 @@ export default function ProductActions({
     const [isLoadingBuy, setIsLoadingBuy] = useState(false);
     const [notes, setNotes] = useState("");
     
-    // Parse custom options
+    // Parse custom options (Legacy)
     const customOptions: CustomOption[] = useMemo(() => {
         if (!customOptionsRaw) return [];
         try {
@@ -48,17 +50,23 @@ export default function ProductActions({
         }
     }, [customOptionsRaw]);
 
-    // State for selected options { "Warna": "Merah", "Ukuran": "XL" }
+    // State for selected legacy options { "Warna": "Merah", "Ukuran": "XL" }
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+    
+    // State for Database Variants
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+    const selectedVariant = useMemo(() => variants?.find((v: any) => v.id === selectedVariantId), [variants, selectedVariantId]);
 
     const router = useRouter();
+
+    const activeStock = selectedVariant ? selectedVariant.stock : stock;
 
     const handleMinus = () => {
         if (quantity > minOrder) setQuantity(q => q - 1);
     };
 
     const handlePlus = () => {
-        if (quantity < stock) setQuantity(q => q + 1);
+        if (quantity < activeStock) setQuantity(q => q + 1);
     };
 
     const handleOptionSelect = (optionName: string, label: string) => {
@@ -70,6 +78,7 @@ export default function ProductActions({
 
     // Calculate dynamic price
     const currentPriceDelta = useMemo(() => {
+        if (selectedVariant) return 0; // Use variant price instead
         let delta = 0;
         customOptions.forEach(opt => {
             const selectedLabel = selectedOptions[opt.name];
@@ -79,12 +88,12 @@ export default function ProductActions({
             }
         });
         return delta;
-    }, [customOptions, selectedOptions]);
+    }, [customOptions, selectedOptions, selectedVariant]);
 
-    const finalPrice = basePrice + currentPriceDelta;
-    const finalOriginalPrice = (originalPrice || basePrice * 1.3) + currentPriceDelta;
+    const finalPrice = selectedVariant?.price ? selectedVariant.price : basePrice + currentPriceDelta;
+    const finalOriginalPrice = selectedVariant?.price ? selectedVariant.price * 1.3 : (originalPrice || basePrice * 1.3) + currentPriceDelta;
 
-    const isAllOptionsSelected = customOptions.every(opt => !!selectedOptions[opt.name]);
+    const isAllOptionsSelected = variants?.length ? !!selectedVariantId : customOptions.every(opt => !!selectedOptions[opt.name]);
 
     const handleAddToCart = async () => {
         if (disabled) return;
@@ -94,7 +103,7 @@ export default function ProductActions({
         }
 
         setIsLoadingCart(true);
-        const result = await addToCart(productId, quantity, selectedOptions, notes);
+        const result = await addToCart(productId, quantity, selectedOptions, notes, selectedVariantId || undefined);
         setIsLoadingCart(false);
 
         if (result.success) {
@@ -117,7 +126,7 @@ export default function ProductActions({
         }
 
         setIsLoadingBuy(true);
-        const result = await addToCart(productId, quantity, selectedOptions, notes);
+        const result = await addToCart(productId, quantity, selectedOptions, notes, selectedVariantId || undefined);
         setIsLoadingBuy(false);
 
         if (result.success) {
@@ -163,8 +172,31 @@ export default function ProductActions({
                 </div>
             )}
 
-            {/* VARIASI CUSTOM (Dinamis dari Database) */}
-            {customOptions.map((opt, idx) => (
+            {/* VARIASI CUSTOM (Database Variants) */}
+            {variants && variants.length > 0 ? (
+                <div className="mb-6 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-start">
+                    <span className="w-24 shrink-0 text-sm font-medium text-[#757575] mt-1.5">Varian</span>
+                    <div className="flex flex-wrap gap-2">
+                        {variants.map((v: any) => {
+                            const isSelected = selectedVariantId === v.id;
+                            const isOutOfStock = v.stock <= 0;
+                            return (
+                                <button 
+                                    key={v.id}
+                                    onClick={() => setSelectedVariantId(v.id)}
+                                    disabled={isOutOfStock}
+                                    className={`px-3 py-1.5 rounded text-sm transition-all border ${
+                                        isOutOfStock ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' :
+                                        isSelected ? 'border-[#EE4D2D] text-[#EE4D2D] bg-[#FFF0ED]' : 'border-[#E8E8E8] text-[#333333] bg-white hover:border-[#EE4D2D]'
+                                    }`}
+                                >
+                                    {v.name} {isOutOfStock && "(Habis)"}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : customOptions.map((opt, idx) => (
                 <div key={idx} className="mb-6 flex flex-col sm:flex-row gap-2 sm:gap-4 sm:items-start">
                     <span className="w-24 shrink-0 text-sm font-medium text-[#757575] mt-1.5">{opt.name}</span>
                     <div className="flex flex-wrap gap-2">
@@ -226,7 +258,7 @@ export default function ProductActions({
                         </button>
                     </div>
                     <div className="text-sm text-[#757575]">
-                        Tersisa <strong className="text-[#333333] font-medium">{stock}</strong> buah
+                        Tersisa <strong className="text-[#333333] font-medium">{activeStock}</strong> buah
                         {minOrder > 1 && <span className="ml-2 text-[#EE4D2D] bg-[#FFF0ED] px-1.5 py-0.5 rounded text-xs">Min. Beli {minOrder}</span>}
                     </div>
                 </div>
@@ -236,7 +268,7 @@ export default function ProductActions({
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <button 
                     onClick={handleAddToCart}
-                    disabled={disabled || isLoadingCart || stock === 0}
+                    disabled={disabled || isLoadingCart || activeStock === 0}
                     className="flex-1 sm:max-w-[250px] bg-[#FFEEE8] text-[#EE4D2D] border border-[#EE4D2D] py-3 rounded text-sm font-medium hover:bg-[#FFF0ED] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path><line x1="12" y1="9" x2="18" y2="9"></line><line x1="15" y1="6" x2="15" y2="12"></line></svg>
@@ -244,7 +276,7 @@ export default function ProductActions({
                 </button>
                 <button 
                     onClick={handleBuyNow}
-                    disabled={disabled || isLoadingBuy || stock === 0}
+                    disabled={disabled || isLoadingBuy || activeStock === 0}
                     className="flex-1 sm:max-w-[250px] bg-[#EE4D2D] text-white py-3 rounded text-sm font-medium hover:bg-[#E04626] transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                     {isLoadingBuy ? "Memproses..." : "Beli Sekarang"}

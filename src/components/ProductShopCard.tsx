@@ -43,7 +43,7 @@ export default function ProductShopCard({ supplier }: { supplier: any }) {
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg>
                             Chat
                         </button>
-                        <Link href="/kategori" className="flex-1 max-w-[120px] px-2 py-1.5 border border-[#E8E8E8] text-[#555555] text-xs font-medium rounded flex items-center justify-center gap-1.5 hover:bg-[#F8F8F8] transition-colors">
+                        <Link href={`/supplier/${supplier?.id || ''}`} className="flex-1 max-w-[120px] px-2 py-1.5 border border-[#E8E8E8] text-[#555555] text-xs font-medium rounded flex items-center justify-center gap-1.5 hover:bg-[#F8F8F8] transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                             Toko
                         </Link>

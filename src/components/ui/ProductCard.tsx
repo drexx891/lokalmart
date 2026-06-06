@@ -1,10 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import type { Product } from "@/types";
+import { useState } from "react";
 
 interface ProductCardProps {
     product: Product & { 
-        // Ekstra field mockup untuk UI
         originalPrice?: number;
         discount?: number;
         rating?: number;
@@ -19,11 +21,14 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+    const [wishlisted, setWishlisted] = useState(false);
+    const [addingToCart, setAddingToCart] = useState(false);
+
     // Harga format Rupiah
     const formattedPrice = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(product.price);
     const formattedOriginal = product.originalPrice ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(product.originalPrice) : null;
 
-    // Menentukan Badge (Hanya satu yang tampil, prioritas: Diskon > Baru > Terlaris)
+    // Menentukan Badge
     let Badge = null;
     if (product.discount) {
         Badge = <div className="absolute top-0 left-0 bg-[#E24B4A] text-white text-[10px] font-bold px-2 py-1 z-10 rounded-br-lg">DISKON -{product.discount}%</div>;
@@ -33,6 +38,33 @@ export default function ProductCard({ product }: ProductCardProps) {
         Badge = <div className="absolute top-0 left-0 bg-[#1A3C6E] text-white text-[10px] font-bold px-2 py-1 z-10 rounded-br-lg">TERLARIS</div>;
     }
 
+    const handleWishlist = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setWishlisted(!wishlisted);
+    };
+
+    const handleAddToCart = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setAddingToCart(true);
+        try {
+            const { addToCart } = await import("@/app/actions/cart");
+            const toast = (await import("react-hot-toast")).toast;
+            const result = await addToCart(product.id, 1);
+            if (result.success) {
+                toast.success(result.message);
+            } else {
+                toast.error(result.message);
+            }
+        } catch {
+            const toast = (await import("react-hot-toast")).toast;
+            toast.error("Silakan login terlebih dahulu");
+        } finally {
+            setAddingToCart(false);
+        }
+    };
+
     return (
         <div className="bg-white rounded-xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden flex flex-col group border border-[#E5E7EB]">
             
@@ -41,16 +73,20 @@ export default function ProductCard({ product }: ProductCardProps) {
                 {Badge}
                 
                 {/* Tombol Wishlist */}
-                <button className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm z-10 text-[#9CA3AF] hover:text-[#E24B4A] md:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                <button 
+                    onClick={handleWishlist}
+                    className={`absolute top-2 right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm z-10 transition-all md:opacity-0 group-hover:opacity-100 ${wishlisted ? 'text-[#E24B4A] opacity-100 scale-110' : 'text-[#9CA3AF] hover:text-[#E24B4A]'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={wishlisted ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                 </button>
 
-                <Link href={`/produk/${product.id}`} className="block w-full h-full">
+                <Link href={`/produk/${product.id}`} className="block w-full h-full relative">
                     {product.imageUrl ? (
                         <Image 
                             src={product.imageUrl} 
                             alt={product.name} 
                             fill 
+                            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                             className="object-cover group-hover:scale-105 transition-transform duration-500" 
                         />
                     ) : (
@@ -59,13 +95,6 @@ export default function ProductCard({ product }: ProductCardProps) {
                         </div>
                     )}
                 </Link>
-                
-                {/* Dot Indikator (Mock) */}
-                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#1A3C6E]"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/70"></div>
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/70"></div>
-                </div>
             </div>
 
             {/* Area Informasi */}
@@ -80,10 +109,11 @@ export default function ProductCard({ product }: ProductCardProps) {
                     {/* Harga */}
                     <div className="flex flex-col mb-1.5">
                         <span className="text-[#1A3C6E] font-bold text-base">{formattedPrice}</span>
-                        {formattedOriginal && (
+                        {formattedOriginal ? (
                             <span className="text-[#9CA3AF] text-[11px] line-through">{formattedOriginal}</span>
+                        ) : (
+                            <span className="h-4"></span>
                         )}
-                        {!formattedOriginal && <span className="h-4"></span> /* spacer */}
                     </div>
 
                     {/* Nama Toko */}
@@ -92,7 +122,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                         <span className="truncate">{product.supplier?.companyName || "Belio Official"}</span>
                     </div>
 
-                    {/* Baris Bawah: Rating & Lokasi */}
+                    {/* Rating & Lokasi */}
                     <div className="flex flex-col gap-1 text-[10px] text-[#6B7280] mt-auto">
                         <div className="flex items-center gap-1">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="#F5A623" stroke="#F5A623" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
@@ -113,8 +143,12 @@ export default function ProductCard({ product }: ProductCardProps) {
             </div>
 
             {/* Tombol Aksi Bawah Kartu */}
-            <button className="w-full bg-[#EAF3FB] text-[#1A3C6E] font-semibold text-[13px] md:text-sm py-1.5 md:py-2 group-hover:bg-[#1A3C6E] group-hover:text-white transition-colors duration-200">
-                + Keranjang
+            <button 
+                onClick={handleAddToCart}
+                disabled={addingToCart}
+                className="w-full bg-[#EAF3FB] text-[#1A3C6E] font-semibold text-[13px] md:text-sm py-1.5 md:py-2 group-hover:bg-[#1A3C6E] group-hover:text-white transition-colors duration-200 disabled:opacity-60"
+            >
+                {addingToCart ? "Menambahkan..." : "+ Keranjang"}
             </button>
 
         </div>

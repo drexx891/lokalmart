@@ -31,20 +31,24 @@ export default async function CheckoutPage() {
     ];
 
     try {
-        const order = await prisma.order.findFirst({
+        const invoice = await prisma.orderInvoice.findFirst({
             where: { userId: sessionUser.id, status: "pending" },
             include: { 
-                items: {
-                    include: { 
-                        product: {
-                            include: { supplier: true }
+                orders: {
+                    include: {
+                        items: {
+                            include: { 
+                                product: {
+                                    include: { supplier: true }
+                                }
+                            }
                         }
                     }
                 } 
             }
         });
 
-        if (!order || order.items.length === 0) {
+        if (!invoice || invoice.orders.length === 0) {
             return (
                 <div className="bg-[#F7F8FA] min-h-screen py-8">
                     <div className="max-w-4xl mx-auto px-4 text-center py-20 bg-white rounded-2xl shadow-sm border border-[#E5E7EB]">
@@ -58,21 +62,23 @@ export default async function CheckoutPage() {
             );
         }
 
-        cartTotal = order.totalAmount;
+        cartTotal = invoice.totalAmount;
         
         // Cek PO (Pre-Order) dan Ketersediaan COD
-        order.items.forEach(item => {
-            const productAny = item.product as any;
-            if (productAny?.isPreOrder && productAny?.preOrderDays) {
-                if (productAny.preOrderDays > maxPreOrderDays) {
-                    maxPreOrderDays = productAny.preOrderDays;
+        invoice.orders.forEach((order: any) => {
+            order.items.forEach((item: any) => {
+                const productAny = item.product as any;
+                if (productAny?.isPreOrder && productAny?.preOrderDays) {
+                    if (productAny.preOrderDays > maxPreOrderDays) {
+                        maxPreOrderDays = productAny.preOrderDays;
+                    }
                 }
-            }
 
-            const supplierAny = productAny?.supplier;
-            if (supplierAny && !supplierAny.allowCOD) {
-                isCodAvailable = false;
-            }
+                const supplierAny = productAny?.supplier;
+                if (supplierAny && !supplierAny.allowCOD) {
+                    isCodAvailable = false;
+                }
+            });
         });
 
         const dbAddresses = await prisma.address.findMany({

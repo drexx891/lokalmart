@@ -1,117 +1,156 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast, Toaster } from "sonner";
+import * as Switch from "@radix-ui/react-switch";
 
 export default function NotifikasiPage() {
-    const tabs = ["Semua", "Transaksi", "Promo", "Sistem"];
-    const [activeTab, setActiveTab] = useState("Semua");
+  const [loading, setLoading] = useState(true);
+  const [prefs, setPrefs] = useState({
+    emailOrder: true,
+    emailPromo: true,
+    emailSecurity: true,
+    pushNotification: false,
+  });
 
-    const notifications = [
-        {
-            id: 1,
-            type: "Transaksi",
-            title: "Pesanan #BL-20459 Sedang Dikirim",
-            desc: "Paket kamu sedang dibawa oleh kurir menuju alamat pengiriman. Pantau terus statusnya ya!",
-            time: "2 jam lalu",
-            isRead: false,
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A5FA0" strokeWidth="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>,
-            bg: "bg-[#EBF2FA]"
-        },
-        {
-            id: 2,
-            type: "Promo",
-            title: "Promo Kilat! Diskon 50% Menunggumu ⚡",
-            desc: "Spesial hari ini, dapatkan diskon 50% untuk produk kecantikan favoritmu. Cek sekarang sebelum kehabisan!",
-            time: "Kemarin",
-            isRead: false,
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5A623" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
-            bg: "bg-[#FEF6E8]"
-        },
-        {
-            id: 3,
-            type: "Transaksi",
-            title: "Pembayaran Berhasil Diterima",
-            desc: "Pembayaran untuk pesanan #BL-20459 telah kami terima. Penjual akan segera memproses pesananmu.",
-            time: "Kemarin",
-            isRead: true,
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2ECC8B" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
-            bg: "bg-[#E8F8F5]"
-        },
-        {
-            id: 4,
-            type: "Sistem",
-            title: "Selamat datang di Belio!",
-            desc: "Terima kasih sudah bergabung dengan Belio. Yuk lengkapi profilmu dan nikmati belanja yang lebih cerdas dan percaya.",
-            time: "3 hari lalu",
-            isRead: true,
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>,
-            bg: "bg-[#F3F4F6]"
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/akun/notifikasi");
+        const data = await res.json();
+        if (data.success && data.data) {
+          setPrefs({
+            emailOrder: data.data.emailOrder,
+            emailPromo: data.data.emailPromo,
+            emailSecurity: data.data.emailSecurity,
+            pushNotification: data.data.pushNotification,
+          });
         }
-    ];
+      } catch {
+        toast.error("Gagal memuat preferensi");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-    const filteredNotifs = activeTab === "Semua" ? notifications : notifications.filter(n => n.type === activeTab);
+  const handleToggle = async (key: keyof typeof prefs, value: boolean) => {
+    if (key === 'emailSecurity') return; // Cannot change
+    
+    // Optimistic update
+    const newPrefs = { ...prefs, [key]: value };
+    setPrefs(newPrefs);
 
+    try {
+      const res = await fetch("/api/akun/notifikasi", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error();
+    } catch {
+      // Revert on failure
+      setPrefs(prefs);
+      toast.error("Gagal memperbarui preferensi");
+    }
+  };
+
+  if (loading) {
     return (
-        <div className="flex flex-col gap-6">
-            
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <Link href="/profil" className="md:hidden p-2 bg-white rounded-full shadow-sm text-[#1F2937] hover:bg-[#F3F4F6]">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                    </Link>
-                    <h1 className="text-2xl font-bold text-[#1F2937]">Notifikasi</h1>
-                </div>
-                <button className="text-sm font-bold text-[#1A3C6E] hover:underline">Tandai Semua Sudah Dibaca</button>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] overflow-hidden flex flex-col">
-                
-                {/* Tabs */}
-                <div className="flex overflow-x-auto hide-scrollbar border-b border-[#E5E7EB]">
-                    {tabs.map(tab => (
-                        <button 
-                            key={tab} 
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-6 py-4 text-sm font-bold whitespace-nowrap transition-colors border-b-2 ${activeTab === tab ? 'border-[#1A3C6E] text-[#1A3C6E]' : 'border-transparent text-[#6B7280] hover:text-[#1F2937]'}`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
-
-                {/* List Notifikasi */}
-                <div className="flex flex-col">
-                    {filteredNotifs.length > 0 ? (
-                        filteredNotifs.map((notif) => (
-                            <div key={notif.id} className={`p-4 md:p-5 flex items-start gap-4 border-b border-[#E5E7EB] hover:bg-[#F9FAFB] transition-colors cursor-pointer ${notif.isRead ? 'bg-white' : 'bg-[#EAF3FB]'}`}>
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${notif.bg}`}>
-                                    {notif.icon}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-2 mb-1">
-                                        <h3 className={`text-sm ${notif.isRead ? 'font-semibold text-[#374151]' : 'font-bold text-[#1F2937] flex items-center gap-2'}`}>
-                                            {!notif.isRead && <span className="w-2 h-2 rounded-full bg-[#1A3C6E]"></span>}
-                                            {notif.title}
-                                        </h3>
-                                        <span className="text-[10px] text-[#9CA3AF] whitespace-nowrap shrink-0">{notif.time}</span>
-                                    </div>
-                                    <p className="text-sm text-[#6B7280] line-clamp-2 leading-relaxed">{notif.desc}</p>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="py-20 flex flex-col items-center justify-center text-center">
-                            <div className="w-20 h-20 bg-[#F3F4F6] rounded-full flex items-center justify-center mb-4 text-[#9CA3AF]">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                            </div>
-                            <h3 className="font-bold text-[#1F2937] text-lg mb-1">Tidak ada notifikasi</h3>
-                            <p className="text-sm text-[#6B7280]">Kamu sudah membaca semua notifikasi terbaru.</p>
-                        </div>
-                    )}
-                </div>
-
-            </div>
+      <div className="space-y-4">
+        <div className="h-8 bg-[#F3F4F6] rounded-lg animate-pulse w-48" />
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 space-y-4">
+          {[1, 2, 3].map(i => <div key={i} className="h-16 bg-[#F3F4F6] rounded-xl animate-pulse" />)}
         </div>
+      </div>
     );
+  }
+
+  return (
+    <>
+      <Toaster position="top-center" richColors />
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-black text-[#1F2937]">Notifikasi</h1>
+          <p className="text-sm text-[#6B7280] mt-1">Atur preferensi komunikasi dan pemberitahuan untuk akun Anda.</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
+          
+          <div className="p-6 border-b border-[#E5E7EB] flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-[#1F2937]">Email Pesanan & Transaksi</h3>
+              <p className="text-sm text-[#6B7280] mt-1 max-w-md">Kirim struk, update status pengiriman, dan konfirmasi pembayaran ke email.</p>
+            </div>
+            <Switch.Root 
+              checked={prefs.emailOrder} 
+              onCheckedChange={(v) => handleToggle('emailOrder', v)}
+              className="w-[42px] h-[24px] bg-gray-200 rounded-full relative data-[state=checked]:bg-[#1A3C6E] outline-none cursor-pointer"
+            >
+              <Switch.Thumb className="block w-[20px] h-[20px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[19px]" />
+            </Switch.Root>
+          </div>
+
+          <div className="p-6 border-b border-[#E5E7EB] flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-[#1F2937]">Email Promo & Penawaran</h3>
+              <p className="text-sm text-[#6B7280] mt-1 max-w-md">Dapatkan info flash sale, voucher diskon, dan produk rekomendasi khusus.</p>
+            </div>
+            <Switch.Root 
+              checked={prefs.emailPromo} 
+              onCheckedChange={(v) => handleToggle('emailPromo', v)}
+              className="w-[42px] h-[24px] bg-gray-200 rounded-full relative data-[state=checked]:bg-[#1A3C6E] outline-none cursor-pointer"
+            >
+              <Switch.Thumb className="block w-[20px] h-[20px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[19px]" />
+            </Switch.Root>
+          </div>
+
+          <div className="p-6 border-b border-[#E5E7EB] flex items-center justify-between opacity-80">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-[#1F2937]">Keamanan Akun</h3>
+                <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] font-bold rounded uppercase">Wajib</span>
+              </div>
+              <p className="text-sm text-[#6B7280] mt-1 max-w-md">Peringatan login dari perangkat baru dan pembaruan password.</p>
+            </div>
+            <Switch.Root 
+              disabled
+              checked={prefs.emailSecurity} 
+              className="w-[42px] h-[24px] bg-gray-200 rounded-full relative data-[state=checked]:bg-gray-400 outline-none cursor-not-allowed"
+            >
+              <Switch.Thumb className="block w-[20px] h-[20px] bg-white rounded-full transition-transform duration-100 translate-x-[19px]" />
+            </Switch.Root>
+          </div>
+
+          <div className="p-6 flex items-center justify-between bg-[#F9FAFB]">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-[#1F2937]">Push Notifications</h3>
+                <span className="px-2 py-0.5 bg-[#EBF2FA] text-[#1A3C6E] text-[10px] font-bold rounded uppercase">Web/Mobile</span>
+              </div>
+              <p className="text-sm text-[#6B7280] mt-1 max-w-md">Terima notifikasi instan langsung di perangkat ini (membutuhkan izin browser).</p>
+            </div>
+            <Switch.Root 
+              checked={prefs.pushNotification} 
+              onCheckedChange={(v) => {
+                if (v && "Notification" in window && Notification.permission !== "granted") {
+                  Notification.requestPermission().then(perm => {
+                    if (perm === "granted") handleToggle('pushNotification', true);
+                    else toast.error("Izin notifikasi ditolak oleh browser");
+                  });
+                } else {
+                  handleToggle('pushNotification', v);
+                }
+              }}
+              className="w-[42px] h-[24px] bg-gray-200 rounded-full relative data-[state=checked]:bg-[#1A3C6E] outline-none cursor-pointer"
+            >
+              <Switch.Thumb className="block w-[20px] h-[20px] bg-white rounded-full transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[19px]" />
+            </Switch.Root>
+          </div>
+
+        </div>
+      </div>
+    </>
+  );
 }

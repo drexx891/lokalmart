@@ -8,6 +8,10 @@ export const dynamic = 'force-dynamic';
 export default async function GrosirPage() {
     // Ambil produk dari database
     let products = await prisma.product.findMany({
+        where: {
+            status: "active",
+            minOrder: { gt: 1 }
+        },
         take: 20
     });
 

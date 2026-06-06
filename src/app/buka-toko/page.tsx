@@ -20,7 +20,7 @@ export default function BukaTokoGatewayPage() {
                 </p>
 
                 <a 
-                    href="http://localhost:3001" 
+                    href={process.env.NEXT_PUBLIC_SELLER_CENTER_URL || "http://localhost:3001"} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                     className="inline-flex items-center gap-3 bg-[#F5A623] text-[#1A3C6E] px-12 py-5 rounded-full font-black text-xl hover:bg-[#e09612] transition-all shadow-lg hover:shadow-2xl hover:-translate-y-1 transform duration-200"

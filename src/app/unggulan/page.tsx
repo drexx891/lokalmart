@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 export default async function UnggulanPage() {
     // Ambil produk dari database, fallback jika kosong
     let products = await prisma.product.findMany({
+        where: { status: "active" },
         take: 20,
         orderBy: {
             createdAt: 'desc' // Menampilkan produk terbaru sebagai unggulan

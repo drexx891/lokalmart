@@ -62,3 +62,80 @@ html[data-scroll-behavior="smooth"] {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+/* Hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ===== Drawer / Overlay Animations ===== */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slideOutLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-slide-out-left {
+  animation: slideOutLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+.animate-fade-out {
+  animation: fadeOut 0.2s ease-out forwards;
+}
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+.animate-bounce-in {
+  animation: bounceIn 0.4s ease-out forwards;
+}
+
+/* ===== Badge Pulse (notification) ===== */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+.animate-badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* ===== Bottom Nav Safe Area ===== */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Space at bottom of page to prevent content hidden behind bottom nav on mobile */
+@media (max-width: 1023px) {
+  main {
+    padding-bottom: 72px;
+  }
+}

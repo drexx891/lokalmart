@@ -55,13 +55,19 @@ export default async function RootLayout({
                 user = sessionUser;
             }
 
-            const pendingOrder = await prisma.order.findFirst({
+            const pendingInvoice = await prisma.orderInvoice.findFirst({
                 where: { userId: sessionUser.id, status: "pending" },
-                include: { items: true }
+                include: { 
+                    orders: {
+                        include: { items: true }
+                    }
+                }
             });
-            if (pendingOrder) {
-                // Sum all quantities
-                cartCount = pendingOrder.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+            if (pendingInvoice) {
+                // Sum all quantities across all sub-orders
+                cartCount = pendingInvoice.orders.reduce((sum: number, order: any) => {
+                    return sum + order.items.reduce((itemSum: number, item: any) => itemSum + item.quantity, 0);
+                }, 0);
             }
         }
     } catch (e) {

@@ -8,31 +8,35 @@ export default async function CartPage() {
     // Cari keranjang "pending" milik user berdasarkan session
     const user = await getCurrentUser();
     
-    let order = null;
+    let invoice = null;
     if (user) {
-        order = await prisma.order.findFirst({
+        invoice = await prisma.orderInvoice.findFirst({
             where: {
                 userId: user.id,
                 status: "pending"
             },
             include: {
-                items: {
+                orders: {
                     include: {
-                        product: {
-                            include: { supplier: true }
+                        supplier: true,
+                        items: {
+                            include: {
+                                product: true,
+                                variant: true
+                            },
+                            orderBy: {
+                                id: 'asc'
+                            }
                         }
-                    },
-                    orderBy: {
-                        id: 'asc'
                     }
                 }
             }
         });
     }
 
-    const cartItems = order?.items || [];
-    const totalAmount = order?.totalAmount || 0;
-    const discountAmount = order?.discountAmount || 0;
+    const cartOrders = invoice?.orders || [];
+    const totalAmount = invoice?.totalAmount || 0;
+    const discountAmount = invoice?.discountAmount || 0;
     const finalTotal = totalAmount - discountAmount;
     const formattedTotal = new Intl.NumberFormat("id-ID", {
         style: "currency",
@@ -66,7 +70,7 @@ export default async function CartPage() {
                     </div>
                 ) : (
                     <CartClient 
-                        initialItems={cartItems} 
+                        initialOrders={cartOrders} 
                         initialDiscount={discountAmount} 
                     />
                 )}

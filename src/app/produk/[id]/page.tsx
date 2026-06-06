@@ -6,6 +6,7 @@ import ProductActions from "@/components/ProductActions";
 import ProductDetails from "@/components/ProductDetails";
 import ProductShopCard from "@/components/ProductShopCard";
 import ProductCard from "@/components/ui/ProductCard";
+import ProductViewTracker from "@/components/ProductViewTracker";
 
 export default async function ProductDetailPage({
   params,
@@ -18,6 +19,7 @@ export default async function ProductDetailPage({
     include: {
       category: true,
       supplier: true,
+      variants: true,
     },
   });
 
@@ -47,6 +49,8 @@ export default async function ProductDetailPage({
 
   return (
     <div className="bg-[#F7F8FA] min-h-screen pb-20">
+      {/* Tracking: catat view produk */}
+      <ProductViewTracker productId={product.id} />
       <div className="max-w-7xl mx-auto px-4 py-6">
         
         {/* Breadcrumb */}
@@ -142,6 +146,7 @@ export default async function ProductDetailPage({
                     isPreOrder={product.isPreOrder}
                     preOrderDays={product.preOrderDays}
                     customOptionsRaw={product.customOptions}
+                    variants={product.variants}
                 />
 
             </div>

@@ -89,3 +89,19 @@ export interface FlashSaleItem {
   sold: number;
 }
 
+// Re-export database types for convenience
+export type {
+  ProductMetricsRow,
+  EventRow,
+  EventConfig,
+  EventProductRow,
+  UserBehaviorRow,
+  TrackBehaviorPayload,
+  HomepageProductsResponse,
+  ProductWithMetrics,
+  EventWithProducts,
+  AIRankingResult,
+  AIRecommendationResult,
+  AIBannerContent,
+} from './database';
+

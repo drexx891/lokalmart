@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 export default function MobileBottomNav({ cartCount = 0 }: { cartCount?: number }) {
     const pathname = usePathname();
     
-    // Hide bottom nav on specific routes like login, register, checkout
-    if (pathname.includes('/login') || pathname.includes('/register') || pathname.includes('/buka-toko')) {
+    // Hide bottom nav on specific routes
+    if (pathname.includes('/login') || pathname.includes('/register') || pathname.includes('/buka-toko') || pathname.includes('/checkout')) {
         return null;
     }
 
@@ -15,27 +15,53 @@ export default function MobileBottomNav({ cartCount = 0 }: { cartCount?: number 
         {
             name: "Beranda",
             href: "/",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            icon: (active: boolean) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+            )
         },
         {
             name: "Kategori",
             href: "/kategori",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            icon: (active: boolean) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                </svg>
+            )
         },
         {
             name: "Promo",
             href: "/promo",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            icon: (active: boolean) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+            )
         },
         {
-            name: "Pesanan",
-            href: "/profil/pesanan",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            name: "Pesan",
+            href: "/pesan",
+            icon: (active: boolean) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            )
         },
         {
             name: "Akun",
             href: "/profil",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            icon: (active: boolean) => (
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            )
         }
     ];
 
@@ -47,12 +73,27 @@ export default function MobileBottomNav({ cartCount = 0 }: { cartCount?: number 
                     <Link 
                         key={item.name} 
                         href={item.href}
-                        className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-colors ${isActive ? 'text-[#1A3C6E]' : 'text-[#9CA3AF]'}`}
+                        className={`relative flex flex-col items-center justify-center w-full h-full gap-0.5 transition-colors ${isActive ? 'text-[#1A3C6E]' : 'text-[#9CA3AF]'}`}
                     >
-                        <div className={isActive ? 'opacity-100' : 'opacity-70'}>
-                            {item.icon}
+                        {/* Active Indicator Dot */}
+                        {isActive && (
+                            <div className="absolute top-1 w-1 h-1 rounded-full bg-[#1A3C6E] animate-bounce-in"></div>
+                        )}
+                        
+                        <div className={`relative ${isActive ? 'opacity-100' : 'opacity-60'} transition-opacity`}>
+                            {item.icon(isActive)}
+                            
+                            {/* Badge for Cart */}
+                            {item.name === "Pesan" && cartCount > 0 && (
+                                <span className="absolute -top-1 -right-1.5 bg-[#E24B4A] text-white text-[8px] min-w-[14px] h-[14px] flex items-center justify-center rounded-full font-bold px-0.5">
+                                    {cartCount > 9 ? '9+' : cartCount}
+                                </span>
+                            )}
                         </div>
-                        <span className={`text-[10px] font-medium ${isActive ? 'font-bold' : ''}`}>{item.name}</span>
+                        
+                        <span className={`text-[10px] leading-none ${isActive ? 'font-bold' : 'font-medium'}`}>
+                            {item.name}
+                        </span>
                     </Link>
                 );
             })}
