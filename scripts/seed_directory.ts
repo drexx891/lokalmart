@@ -117,7 +117,7 @@ async function main() {
 
     // Helper to find category ID
     const getCategoryId = (mainName: string) => {
-        const match = dbCategories.find(c => c.name.toUpperCase().includes(mainName.split(' ')[0]));
+        const match = dbCategories.find((c: any) => c.name.toUpperCase().includes(mainName.split(' ')[0]));
         return match ? match.id : dbCategories[0].id; // Fallback to first
     };
 
